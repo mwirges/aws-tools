@@ -30,6 +30,7 @@ function displayUsage()
     echo    "    --aws-secret-access-key    AWS Secret Access Key (optional, defaults to \$AWS_SECRET_ACCESS_KEY)"
     echo    "    --method                   HTTP request method (optional, defaults to '${method}' method)"
     echo    "    --minute-expire            Minutes to expire signed URL (optional, defaults to '${minuteExpire}' minutes)"
+    echo    "    --awscli-profile           Read AWS credential from aws cli tools with the given profile  (optional, defaults to 'default', requires aws cli tools)"
     echo -e "\033[1;36m"
     echo    "EXAMPLES :"
     echo    "    ./${scriptName} --help"
@@ -80,6 +81,7 @@ function main()
     local region="${AWS_DEFAULT_REGION}"
     local awsAccessKeyID="${AWS_ACCESS_KEY_ID}"
     local awsSecretAccessKey="${AWS_SECRET_ACCESS_KEY}"
+    local awsCliProfile=""
     method='GET'
     minuteExpire=15
 
@@ -152,11 +154,30 @@ function main()
                 fi
 
                 ;;
+            --awscli-profile)
+                shift
+
+                if [[ ${#} -gt 0 ]]; then
+                    local awsCliProfile="$(trimString "${1}")"
+                fi
+                ;;
             *)
                 shift
                 ;;
         esac
     done
+
+    if [[ -z "${awsAccessKeyID}" || -n "${awsCliProfile}" ]]; then
+        which aws >/dev/null 2>&1
+        if [ $? = 0 ]; then
+            local profile=""
+            [[ -n "${awsCliProfile}" ]] && local profile="--profile ${awsCliProfile}"
+
+            local awsAccessKeyID=$(aws configure get aws_access_key_id ${profile})
+            local awsSecretAccessKey=$(aws configure get aws_secret_access_key ${profile})
+        fi
+    fi 
+
 
     if [[ "$(isEmptyString ${bucket})" = 'true' || "$(isEmptyString ${filePath})" = 'true' ||
           "$(isEmptyString ${awsAccessKeyID})" = 'true' || "$(isEmptyString ${awsSecretAccessKey})" = 'true' ]]
